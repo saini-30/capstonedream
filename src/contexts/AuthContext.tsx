@@ -1,128 +1,146 @@
 
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { supabase } from "@/lib/supabase";
+import { User } from "@supabase/supabase-js";
 
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock user data - in a real app, this would come from a backend
-const mockUsers = [
-  {
-    id: '1',
-    email: 'user@example.com',
-    name: 'Demo User',
-    password: 'password123'
-  }
-];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
   
-  // Check if user is logged in from localStorage
+  // Check if user is already logged in
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error("Failed to parse user from localStorage:", error);
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+        } else {
+          setUser(null);
+        }
       }
-    }
+    );
+
+    // Get current session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
+    };
+    
+    getInitialSession();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
   
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Find user with matching email and password
-    const matchedUser = mockUsers.find(
-      u => u.email === email && u.password === password
-    );
-    
-    if (matchedUser) {
-      const { password, ...userWithoutPassword } = matchedUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem("user", JSON.stringify(userWithoutPassword));
-      
-      toast({
-        title: "Login successful",
-        description: `Welcome back, ${userWithoutPassword.name}!`,
-        duration: 3000,
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
       
-      return true;
-    } else {
+      if (error) {
+        toast({
+          title: "Login failed",
+          description: error.message,
+          duration: 3000,
+        });
+        return false;
+      }
+      
+      if (data?.user) {
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${data.user.email}!`,
+          duration: 3000,
+        });
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
-        description: "Invalid email or password. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         duration: 3000,
       });
-      
       return false;
     }
   };
   
   const signup = async (name: string, email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Check if email already exists
-    if (mockUsers.some(u => u.email === email)) {
-      toast({
-        title: "Signup failed",
-        description: "Email already in use. Please try a different email or log in.",
-        duration: 3000,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+        }
       });
       
+      if (error) {
+        toast({
+          title: "Signup failed",
+          description: error.message,
+          duration: 3000,
+        });
+        return false;
+      }
+      
+      if (data?.user) {
+        toast({
+          title: "Signup successful",
+          description: "Please check your email to confirm your account.",
+          duration: 3000,
+        });
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Signup error:", error);
+      toast({
+        title: "Signup failed",
+        description: "An unexpected error occurred. Please try again.",
+        duration: 3000,
+      });
       return false;
     }
-    
-    // Create new user
-    const newUser = {
-      id: (mockUsers.length + 1).toString(),
-      email,
-      name,
-      password
-    };
-    
-    mockUsers.push(newUser);
-    
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem("user", JSON.stringify(userWithoutPassword));
-    
-    toast({
-      title: "Signup successful",
-      description: `Welcome to Capstone, ${name}!`,
-      duration: 3000,
-    });
-    
-    return true;
   };
   
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-      duration: 2000,
-    });
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        title: "Logout failed",
+        description: "An unexpected error occurred. Please try again.",
+        duration: 3000,
+      });
+    }
   };
   
   return (

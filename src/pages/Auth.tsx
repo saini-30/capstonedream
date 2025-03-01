@@ -70,8 +70,6 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
       const success = await login(email, password);
       if (success) {
         onSuccess();
-      } else {
-        setError("Invalid email or password");
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -138,12 +136,6 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "Signing in..." : "Sign In"}
       </Button>
-      
-      <div className="text-center text-sm text-muted-foreground mt-4">
-        <p>Demo credentials:</p>
-        <p>Email: user@example.com</p>
-        <p>Password: password123</p>
-      </div>
     </form>
   );
 };
@@ -258,6 +250,10 @@ const SignupForm = ({ onSuccess }: SignupFormProps) => {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "Creating Account..." : "Create Account"}
       </Button>
+      
+      <p className="text-center text-sm text-muted-foreground mt-4">
+        By signing up, you agree to our Terms of Service and Privacy Policy.
+      </p>
     </form>
   );
 };

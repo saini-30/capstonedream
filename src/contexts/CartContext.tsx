@@ -2,6 +2,8 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Product } from "@/data/products";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "./AuthContext";
 
 interface CartItem extends Product {
   quantity: number;
@@ -23,23 +25,78 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
   
-  // Load cart from localStorage on initial render
+  // Load cart when user changes
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (error) {
-        console.error("Failed to parse cart from localStorage:", error);
+    const loadCart = async () => {
+      if (isAuthenticated && user) {
+        // Try to get cart from Supabase
+        const { data, error } = await supabase
+          .from('carts')
+          .select('items')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) {
+          console.error("Failed to load cart from Supabase:", error);
+          // If no cart exists for this user, create one
+          if (error.code === 'PGRST116') {
+            // Load from localStorage as fallback and sync later
+            const savedCart = localStorage.getItem("cart");
+            if (savedCart) {
+              try {
+                setCart(JSON.parse(savedCart));
+              } catch (err) {
+                console.error("Failed to parse cart from localStorage:", err);
+              }
+            }
+          }
+        } else if (data) {
+          setCart(data.items || []);
+        }
+      } else {
+        // Not authenticated, use localStorage
+        const savedCart = localStorage.getItem("cart");
+        if (savedCart) {
+          try {
+            setCart(JSON.parse(savedCart));
+          } catch (error) {
+            console.error("Failed to parse cart from localStorage:", error);
+          }
+        }
       }
-    }
-  }, []);
+    };
+    
+    loadCart();
+  }, [user, isAuthenticated]);
   
-  // Save cart to localStorage whenever it changes
+  // Save cart when it changes
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
+    const saveCart = async () => {
+      // Always save to localStorage as backup
+      localStorage.setItem("cart", JSON.stringify(cart));
+      
+      // If authenticated, also save to Supabase
+      if (isAuthenticated && user) {
+        const { error } = await supabase
+          .from('carts')
+          .upsert({ 
+            user_id: user.id, 
+            items: cart,
+            updated_at: new Date().toISOString()
+          }, { 
+            onConflict: 'user_id' 
+          });
+        
+        if (error) {
+          console.error("Failed to save cart to Supabase:", error);
+        }
+      }
+    };
+    
+    saveCart();
+  }, [cart, isAuthenticated, user]);
   
   const addToCart = (product: Product, quantity = 1) => {
     const existingItem = cart.find(item => item.id === product.id);
@@ -89,13 +146,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const clearCart = () => {
+  const clearCart = async () => {
     setCart([]);
+    
     toast({
       title: "Cart cleared",
       description: "All items have been removed from your cart.",
       duration: 2000,
     });
+    
+    // If authenticated, clear from Supabase too
+    if (isAuthenticated && user) {
+      const { error } = await supabase
+        .from('carts')
+        .update({ items: [], updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error("Failed to clear cart in Supabase:", error);
+      }
+    }
   };
   
   const isInCart = (productId: string): boolean => {

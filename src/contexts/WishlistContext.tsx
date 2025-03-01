@@ -2,6 +2,8 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Product } from "@/data/products";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "./AuthContext";
 
 type WishlistContextType = {
   wishlist: Product[];
@@ -16,23 +18,78 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
   
-  // Load wishlist from localStorage on initial render
+  // Load wishlist when user changes
   useEffect(() => {
-    const savedWishlist = localStorage.getItem("wishlist");
-    if (savedWishlist) {
-      try {
-        setWishlist(JSON.parse(savedWishlist));
-      } catch (error) {
-        console.error("Failed to parse wishlist from localStorage:", error);
+    const loadWishlist = async () => {
+      if (isAuthenticated && user) {
+        // Try to get wishlist from Supabase
+        const { data, error } = await supabase
+          .from('wishlists')
+          .select('products')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) {
+          console.error("Failed to load wishlist from Supabase:", error);
+          // If no wishlist exists for this user, create one
+          if (error.code === 'PGRST116') {
+            // Load from localStorage as fallback and sync later
+            const savedWishlist = localStorage.getItem("wishlist");
+            if (savedWishlist) {
+              try {
+                setWishlist(JSON.parse(savedWishlist));
+              } catch (err) {
+                console.error("Failed to parse wishlist from localStorage:", err);
+              }
+            }
+          }
+        } else if (data) {
+          setWishlist(data.products || []);
+        }
+      } else {
+        // Not authenticated, use localStorage
+        const savedWishlist = localStorage.getItem("wishlist");
+        if (savedWishlist) {
+          try {
+            setWishlist(JSON.parse(savedWishlist));
+          } catch (error) {
+            console.error("Failed to parse wishlist from localStorage:", error);
+          }
+        }
       }
-    }
-  }, []);
+    };
+    
+    loadWishlist();
+  }, [user, isAuthenticated]);
   
-  // Save wishlist to localStorage whenever it changes
+  // Save wishlist when it changes
   useEffect(() => {
-    localStorage.setItem("wishlist", JSON.stringify(wishlist));
-  }, [wishlist]);
+    const saveWishlist = async () => {
+      // Always save to localStorage as backup
+      localStorage.setItem("wishlist", JSON.stringify(wishlist));
+      
+      // If authenticated, also save to Supabase
+      if (isAuthenticated && user) {
+        const { error } = await supabase
+          .from('wishlists')
+          .upsert({ 
+            user_id: user.id, 
+            products: wishlist,
+            updated_at: new Date().toISOString()
+          }, { 
+            onConflict: 'user_id' 
+          });
+        
+        if (error) {
+          console.error("Failed to save wishlist to Supabase:", error);
+        }
+      }
+    };
+    
+    saveWishlist();
+  }, [wishlist, isAuthenticated, user]);
   
   const addToWishlist = (product: Product) => {
     if (!isInWishlist(product.id)) {
@@ -62,13 +119,26 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     return wishlist.some(product => product.id === productId);
   };
   
-  const clearWishlist = () => {
+  const clearWishlist = async () => {
     setWishlist([]);
+    
     toast({
       title: "Wishlist cleared",
       description: "All items have been removed from your wishlist.",
       duration: 2000,
     });
+    
+    // If authenticated, clear from Supabase too
+    if (isAuthenticated && user) {
+      const { error } = await supabase
+        .from('wishlists')
+        .update({ products: [], updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error("Failed to clear wishlist in Supabase:", error);
+      }
+    }
   };
   
   return (
