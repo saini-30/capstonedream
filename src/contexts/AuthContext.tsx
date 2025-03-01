@@ -10,6 +10,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  getUserName: (user: User | null) => string;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,6 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  // Helper function to get user's name from metadata
+  const getUserName = (user: User | null): string => {
+    if (!user) return '';
+    return user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+  };
   
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -149,7 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!user,
       login, 
       signup, 
-      logout 
+      logout,
+      getUserName
     }}>
       {children}
     </AuthContext.Provider>

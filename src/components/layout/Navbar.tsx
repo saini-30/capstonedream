@@ -12,7 +12,7 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, getUserName } = useAuth();
   const { getCartCount } = useCart();
   const { wishlist } = useWishlist();
   
@@ -105,11 +105,11 @@ const Navbar = () => {
             <div className="relative group">
               <button className="p-1.5 text-foreground/80 transition-colors hover:text-foreground flex items-center gap-2">
                 <User size={20} />
-                <span className="text-sm font-medium">{user?.name.split(' ')[0]}</span>
+                <span className="text-sm font-medium">{getUserName(user).split(' ')[0]}</span>
               </button>
               <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-md overflow-hidden z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
                 <div className="p-3 border-b">
-                  <p className="font-medium text-sm">{user?.name}</p>
+                  <p className="font-medium text-sm">{getUserName(user)}</p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">My Profile</Link>
@@ -210,7 +210,7 @@ const Navbar = () => {
                     <div className="flex items-center space-x-2 mb-4">
                       <User size={20} />
                       <div>
-                        <p className="font-medium">{user?.name}</p>
+                        <p className="font-medium">{getUserName(user)}</p>
                         <p className="text-sm text-muted-foreground">{user?.email}</p>
                       </div>
                     </div>
