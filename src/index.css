@@ -129,8 +129,9 @@
     @apply transition-transform duration-300 hover:scale-[1.02];
   }
 
+  /* Product card class - separating group from @apply */
   .product-card {
-    @apply group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md;
+    @apply relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md;
   }
   
   .product-image-container {

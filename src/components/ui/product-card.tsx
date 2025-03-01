@@ -55,7 +55,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
     : 0;
   
   return (
-    <Link to={`/product/${product.id}`} className={cn("product-card", className)}>
+    <Link to={`/product/${product.id}`} className={cn("product-card group", className)}>
       <div className="product-image-container">
         <img
           src={product.image}
