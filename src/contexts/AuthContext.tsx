@@ -7,6 +7,7 @@ import { User } from "@supabase/supabase-js";
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const { toast } = useToast();
   
   // Check if user is already logged in
@@ -28,14 +30,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUser(null);
         }
+        setIsInitializing(false);
       }
     );
 
     // Get current session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+        }
+      } catch (error) {
+        console.error("Error getting session:", error);
+      } finally {
+        setIsInitializing(false);
       }
     };
     
@@ -154,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ 
       user, 
       isAuthenticated: !!user,
+      isInitializing,
       login, 
       signup, 
       logout,
