@@ -1,10 +1,10 @@
 
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Heart, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
-import { useToast } from "@/hooks/use-toast";
+import { useWishlist } from "@/contexts/WishlistContext";
+import { useCart } from "@/contexts/CartContext";
 
 export interface Product {
   id: string;
@@ -24,30 +24,22 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const { toast } = useToast();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { addToCart, isInCart } = useCart();
   
   const toggleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsWishlisted(!isWishlisted);
     
-    toast({
-      title: isWishlisted ? "Removed from wishlist" : "Added to wishlist",
-      description: isWishlisted 
-        ? `${product.name} has been removed from your wishlist.` 
-        : `${product.name} has been added to your wishlist.`,
-      duration: 2000,
-    });
+    if (isInWishlist(product.id)) {
+      removeFromWishlist(product.id);
+    } else {
+      addToWishlist(product);
+    }
   };
   
-  const addToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
-    
-    toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
-      duration: 2000,
-    });
+    addToCart(product);
   };
   
   const discount = product.originalPrice 
@@ -66,11 +58,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
         <button 
           className="wish-button" 
           onClick={toggleWishlist}
-          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-label={isInWishlist(product.id) ? "Remove from wishlist" : "Add to wishlist"}
         >
           <Heart 
             size={18} 
-            className={isWishlisted ? "fill-primary text-primary" : ""} 
+            className={isInWishlist(product.id) ? "fill-primary text-primary" : ""} 
           />
         </button>
         
@@ -103,10 +95,13 @@ export function ProductCard({ product, className }: ProductCardProps) {
             size="sm" 
             variant="outline" 
             className="add-to-cart-button" 
-            onClick={addToCart}
+            onClick={handleAddToCart}
+            disabled={isInCart(product.id)}
           >
             <ShoppingCart size={16} className="mr-1" />
-            <span className="sr-only sm:not-sr-only">Add</span>
+            <span className="sr-only sm:not-sr-only">
+              {isInCart(product.id) ? "Added" : "Add"}
+            </span>
           </Button>
         </div>
       </div>
